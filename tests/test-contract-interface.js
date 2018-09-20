@@ -173,6 +173,26 @@ describe('ABI Coder ABIv2 Decoding', function() {
         it(('decodes ABIv2 parameters - ' + test.name + ' - ' + test.types), function() {
             var decoded = coder.decode(types, result);
             assert.ok(equals(decoded, values), 'decoded positional parameters - ' + title);
+
+            // Test for mutation
+            // https://github.com/ethers-io/ethers.js/issues/200
+            // https://github.com/ethers-io/ethers.js/issues/201
+
+            // @TODO: Expose parseParameter
+            // Check that it works with objects as well as strings
+            var expandedTypes = [];
+            types.forEach(function(type) {
+                var sig = 'function foo(' + type + ' foo)';
+                var abi = ethers.utils.AbiCoder.parseSignature(sig);
+                expandedTypes.push(abi.inputs[0]);
+            });
+
+            var typesBefore = JSON.stringify(expandedTypes);
+
+            decoded = coder.decode(expandedTypes, result);
+            assert.ok(equals(decoded, values), 'decoded positional parameters - ' + title);
+
+            assert.equal(typesBefore, JSON.stringify(expandedTypes), 'decoding does not modify the types');
         });
     });
 });
@@ -240,4 +260,15 @@ describe('Test Invalid Input', function() {
             return true;
         }, 'null bytes throws an error');
     });
+
+    it('fails to encode fixed bytes that are out of range', function() {
+        assert.throws(function() {
+            var result = coder.encode([ 'bytes32' ], [ '0x012345678901234567890123456789012345678901234567890123456789012345' ]);
+            console.log('Result', result);
+        }, function(error) {
+            assert.equal(error.reason, 'invalid bytes32 value', 'got invalid bytes32');
+            return true;
+        }, 'long bytes32 throws an error');
+    });
+
 });
